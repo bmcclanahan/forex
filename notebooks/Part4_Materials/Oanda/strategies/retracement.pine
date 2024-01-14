@@ -1,0 +1,98 @@
+//@version=5
+strategy(title="Fib Retracment", max_labels_count=500, overlay=true, shorttitle="FIB", currency=currency.USD, format=format.price, precision=2, pyramiding=1, default_qty_value=20000, commission_type=strategy.commission.percent,commission_value=0)
+
+
+retracePeriod = input(90, title="Retrace Period")
+
+adxPeriod = input(defval = 200, title="ADX long period")
+adxShortPeriod = input(defval=14, title="ADX short period")
+adxShortThreshold = input(defval=20, title="ADX Threshold")
+atrPeriod = input(14, title="ATR Period")
+atrMultiplier = input(3, title="ATR Multiplier")
+adxThreshold = input(defval=20, title="ADX Threshold")
+retraceThreshold = input.float(0.5, title="Retrace Threshold", minval=0, step=0.1 )
+tradeMode = input.string("short", title="Trade Mode", options=["long", "short", "both"])
+
+
+highIndex = ta.highestbars(retracePeriod)
+highVal = ta.highest(retracePeriod)
+lowIndex = ta.lowestbars(retracePeriod)
+lowVal = ta.lowest(retracePeriod)
+highOffset = math.abs(highIndex)
+lowOffset = math.abs(lowIndex)
+
+[di_pos, di_neg, adx] = ta.dmi(adxPeriod, 20)
+
+[di_pos_short, di_neg_short, adx_short] = ta.dmi(adxShortPeriod, adxShortPeriod)
+
+atr = ta.atr(atrPeriod)
+
+sto = (close - lowVal) / (highVal - lowVal)
+
+//series to find bars that created new highs opposed to just 
+//becoming the new high because a previous high trails off.
+wasNewHigh = high == highVal
+wasNewLow = low == lowVal
+highPivot = ta.pivothigh(retracePeriod, 5)
+lowPivot = ta.pivotlow(retracePeriod, 5)
+
+
+newHighAndNewLow = wasNewHigh[highOffset] and wasNewLow[lowOffset]
+adxWasHigh = adx_short[highOffset] > adxThreshold and adx_short[lowOffset] > adxThreshold
+short_entry = highIndex < lowIndex and ta.crossover(sto, retraceThreshold) and newHighAndNewLow and adxWasHigh  // and di_pos < di_neg
+long_entry = highIndex > lowIndex and ta.crossunder(sto, retraceThreshold) and newHighAndNewLow and adxWasHigh  // and di_pos < di_neg
+
+
+plotSetup() =>
+	label.new(chart.point.from_time(time[highOffset], high[highOffset]), xloc=xloc.bar_time, yloc=yloc.abovebar,  text="high", style=label.style_triangledown, textcolor = color.rgb(255, 0, 0))
+	label.new(chart.point.from_time(time[lowOffset], low[lowOffset]), xloc=xloc.bar_time, yloc=yloc.belowbar,  text="low", style=label.style_triangleup, textcolor = color.rgb(255, 0, 0))
+
+
+scaledATR = atrMultiplier * atr
+
+if short_entry and strategy.position_size == 0 and (tradeMode == "short" or tradeMode == "both") and (di_pos - di_neg) < 0
+	strategy.entry("Short", strategy.short)
+	strategy.exit(id="Short", comment="Short Exit", stop=highVal + scaledATR, limit=lowVal - scaledATR)
+	plotSetup()
+
+
+if long_entry and strategy.position_size == 0 and (tradeMode == "long" or tradeMode == "both") and (di_pos - di_neg) > 0
+	strategy.entry("Long", strategy.long)
+	strategy.exit(id="Long", comment="Long Exit", stop=lowVal - scaledATR, limit=highVal + scaledATR)
+	plotSetup()
+
+// if short_entry and strategy.position_size == 0 and (tradeMode == "long" or tradeMode == "both")
+// 	strategy.entry("Short", strategy.short)
+// 	strategy.exit(id="Short", comment="Short Exit", stop=highVal + scaledATR, profit=lowVal - scaledATR)
+// 	plotSetup()
+
+
+
+if long_entry and strategy.position_size == 0 and (tradeMode == "short" or tradeMode == "both") and (di_pos - di_neg) < 0
+	strategy.entry("Short 2", strategy.short)
+	strategy.exit(id="Short 2", comment="Short 2 Exit", stop=highVal + scaledATR, limit=lowVal - scaledATR)
+	plotSetup()
+
+if short_entry and strategy.position_size == 0 and (tradeMode == "long" or tradeMode == "both") and (di_pos - di_neg) > 0
+	strategy.entry("Long", strategy.long)
+	strategy.exit(id="Long", comment="Long Exit", stop=lowVal - scaledATR, limit=highVal + scaledATR)
+	plotSetup()
+
+
+plotchar(highVal, title="Highest", location=location.top)
+plotchar(lowVal, title="Lowest", location=location.top)
+plotchar(close, title="Close", location=location.top)
+
+plotchar(highPivot, title="High Pivot", location=location.top)
+plotchar(highIndex, title="High Index", location=location.top)
+plotchar(adx_short, title="ADX", location=location.top)
+
+
+
+// plotshape(high == highVal, title="high", style=shape.triangledown, location=location.abovebar, color=color.rgb(95, 201, 72), size=size.small)
+// plotshape(low == lowVal, title="low", style=shape.triangleup, location=location.belowbar, color=color.rgb(95, 201, 72), size=size.small)
+
+//plotchar(ta.crossover(rsi, rsiMA), title="RSI Crossover")
+
+// alertcondition(bullCondAlert, title='Regular Bullish Divergence', message="Found a new Regular Bullish Divergence, `Pivot Lookback Right` number of bars to the left of the current bar.")
+// alertcondition(bearCondAlert, title='Regular Bearish Divergence', message='Found a new Regular Bearish Divergence, `Pivot Lookback Right` number of bars to the left of the current bar.')
